@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>House Finishing Tracker</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card-bg: #ffffff;
+    --col-bg: #e9ebef;
+    --border: #d6d9df;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --urgent: #dc2626;
+    --urgent-bg: #fef2f2;
+    --done: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 16px 24px;
+    background: #111827;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+    font-weight: 600;
+  }
+  .budget-bar {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .budget-stat {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+  .budget-stat span.val {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .budget-stat.over span.val { color: #f87171; }
+  .budget-cap-input {
+    width: 100px;
+    background: #1f2937;
+    border: 1px solid #374151;
+    color: #fff;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  main {
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    overflow-x: auto;
+  }
+  .column {
+    background: var(--col-bg);
+    border-radius: 10px;
+    width: 300px;
+    flex: 0 0 300px;
+    min-height: 200px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+  }
+  .column.dragover { outline: 2px dashed var(--accent); outline-offset: -4px; }
+  .column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 6px 10px;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+  }
+  .column-count {
+    background: #fff;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 12px;
+  }
+  .cards {
+    flex: 1;
+    min-height: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08);
+    cursor: pointer;
+    border-left: 4px solid var(--accent);
+  }
+  .card.urgent { border-left-color: var(--urgent); background: var(--urgent-bg); }
+  .card.dragging { opacity: .4; }
+  .card-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-row-title {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-row-total {
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .card-row .del {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1;
+  }
+  .card-row .del:hover { color: var(--urgent); }
+  .card-detail {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .card-notes {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    white-space: pre-wrap;
+  }
+  .card-budget {
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .card-budget b { color: var(--text); }
+  .card-detail-actions { margin-top: 8px; }
+  .card-detail-actions button { padding: 4px 10px; font-size: 12px; }
+  .urgent-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--urgent);
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+  }
+  .add-form {
+    margin-top: 8px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .add-form.open { display: flex; }
+  .add-form input, .add-form textarea {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .add-form textarea { resize: vertical; min-height: 40px; }
+  .add-form label {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--muted);
+  }
+  .add-form-row { display: flex; gap: 6px; }
+  .add-form-row input { flex: 1; }
+  .add-form-actions { display: flex; gap: 6px; }
+  .add-form-actions button { flex: 1; }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-cancel { background: #e5e7eb; color: var(--text); }
+  .add-toggle {
+    width: 100%;
+    background: transparent;
+    color: var(--muted);
+    text-align: left;
+    padding: 8px 6px;
+    font-weight: 500;
+  }
+  .add-toggle:hover { background: rgba(0,0,0,.04); }
+
+  @media (max-width: 680px) {
+    header { padding: 14px 16px; }
+    .budget-bar { gap: 14px; }
+    main { flex-direction: column; padding: 14px; overflow-x: visible; }
+    .column { width: 100%; flex-basis: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>House Finishing Tracker</h1>
+  <div class="budget-bar">
+    <div class="budget-stat">
+      Total budget
+      <input id="capInput" class="budget-cap-input" type="number" min="0" placeholder="e.g. 500000">
+    </div>
+    <div class="budget-stat">Total items <span class="val" id="statItems">0</span></div>
+    <div class="budget-stat">Total labor <span class="val" id="statLabor">0</span></div>
+    <div class="budget-stat">Budgeted <span class="val" id="statBudgeted">0</span></div>
+    <div class="budget-stat">Spent <span class="val" id="statSpent">0</span></div>
+    <div class="budget-stat" id="statRemainingWrap">Remaining <span class="val" id="statRemaining">0</span></div>
+  </div>
+</header>
+
+<main id="board"></main>
+
+<script>
+const STORAGE_KEY = "house-finishing-board-v2";
+
+const DEFAULT_STATE = {
+  cap: 1600000,
+  columns: [
+    { id: "todo", title: "To Do", items: [
+      { id: cid(), title: "Finish electrical", notes: "Still some shorting going on. Need to sort out before closing walls. Labor/items are rough estimates — confirm with electrician. PRIORITY 1: safety issue, do first.", itemsCost: 15000, laborCost: 8000, spent: 0, urgent: true },
+      { id: cid(), title: "Secure fencing + fix front gates", notes: "Concrete posts, big steel gates. DECIDED: see-through gates (only garden is visible from outside, not the house, so no privacy tradeoff) — full visibility to spot loitering. Want remote-control operation — ask whoever installed the roller door if they also do automated gates, or can recommend someone. Includes rough mid-range estimate for motor+remote kit (~40,000) and install labor (~10,000) — actual cost ranges 25k-60k for the kit depending on swing vs sliding and gate weight; get a real quote. PRIORITY 2: perimeter security.", itemsCost: 190000, laborCost: 70000, spent: 0, urgent: false },
+      { id: cid(), title: "Security lighting around house", notes: "Rough estimate — confirm with installer. PRIORITY 3: pairs with fencing/gates for security.", itemsCost: 8000, laborCost: 3000, spent: 0, urgent: false },
+      { id: cid(), title: "Fix pond area", notes: "Need a pump in it. Items = electrical + pump. PRIORITY 4: standing water / functional fix.", itemsCost: 10000, laborCost: 1500, spent: 0, urgent: false },
+      { id: cid(), title: "Netting over seedling area", notes: "Solid netting covering. Mount with some slack (not pulled taut) and use bungee/wire tensioners rather than rigid tie-off, so wind can flex it instead of ripping it. Rough estimate. PRIORITY 5: time-sensitive, seedlings growing now.", itemsCost: 3000, laborCost: 1500, spent: 0, urgent: false },
+      { id: cid(), title: "Install solar", notes: "Household currently spends ~6,000 pesos/month on electricity (3 people). Equipment ~500,000, labor ~40,000 (Paul's own estimate, confirmed). PRIORITY 6: ongoing cost saver, worth doing before finishing work locks up budget.", itemsCost: 500000, laborCost: 40000, spent: 0, urgent: false },
+      { id: cid(), title: "Buy a bath for masters bathroom", notes: "Labor = plumbing hookup/install, rough estimate. PRIORITY 7: buy before finishing so tiling/plumbing is built around it.", itemsCost: 40000, laborCost: 5000, spent: 0, urgent: false },
+      { id: cid(), title: "Finish masters bathroom", notes: "Tiling and plumbing already done. Remaining is landscaping — it's an outdoor open area. PRIORITY 8.", itemsCost: 40000, laborCost: 20000, spent: 0, urgent: false },
+      { id: cid(), title: "Install Atmos speakers", notes: "1 day to install. Speaker unit cost is a rough mid-range estimate — confirm actual model/price. PRIORITY 9: entertainment, do after core finishing.", itemsCost: 30000, laborCost: 500, spent: 0, urgent: false },
+      { id: cid(), title: "New amp", notes: "Self-install, no labor needed. PRIORITY 10: pairs with Atmos speakers.", itemsCost: 42000, laborCost: 0, spent: 0, urgent: false },
+      { id: cid(), title: "Projector power run + battery backup", notes: "Run power down to the voltage regulator for the projector. Add a UPS/battery backup on the projector circuit so it doesn't lose power/cut out during an outage. Rough estimate — confirm with electrician. PRIORITY 10b: pairs with home theater work.", itemsCost: 12000, laborCost: 4000, spent: 0, urgent: false },
+      { id: cid(), title: "Battery backup for internet (Starlink + router)", notes: "UPS so Starlink dish, router, and switch stay up through a power outage. Rough estimate for a unit sized to run Starlink (~40-75W) plus router for a few hours — confirm actual wattage/runtime needed with supplier. PRIORITY 4b: pairs with the safety/security priority tier, internet loss during an outage is a real gap.", itemsCost: 15000, laborCost: 2000, spent: 0, urgent: false },
+      { id: cid(), title: "2 chairs for outdoor area", notes: "Upholstered. PRIORITY 11: furnishing, low urgency.", itemsCost: 6000, laborCost: 0, spent: 0, urgent: false },
+      { id: cid(), title: "Build swimming pool", notes: "PARKED — pulled out of the current budget (was ~600k items / 300k labor, blew the budget). Keeping the idea on the board but not counted in totals until reconsidered.", itemsCost: 0, laborCost: 0, spent: 0, urgent: false },
+      { id: cid(), title: "Plant bougainvillea around entire property", notes: "Perimeter hedge/vine planting. Very rough estimate, depends on actual perimeter length — confirm with nursery/landscaper.", itemsCost: 15000, laborCost: 5000, spent: 0, urgent: false },
+      { id: cid(), title: "Seal air-conditioning duct", notes: "Rough estimate for sealant/insulation + labor.", itemsCost: 2000, laborCost: 2000, spent: 0, urgent: false },
+      { id: cid(), title: "Fix strip lighting in master bedroom", notes: "Rough estimate for LED strip + labor.", itemsCost: 2000, laborCost: 1500, spent: 0, urgent: false },
+      { id: cid(), title: "Build storage shed near water tank", notes: "Rough estimate for a small basic shed (materials + build labor) — confirm size/spec and get a real quote.", itemsCost: 25000, laborCost: 15000, spent: 0, urgent: false },
+      { id: cid(), title: "Gravity-feed water system from top tank", notes: "Connect the top blue tank directly to the water supply so gravity does most of the work, with the pump as backup only (saves pump wear/power). Rough estimate for pipework, valves, plumber labor — confirm with plumber, pairs well with the solar work.", itemsCost: 20000, laborCost: 12000, spent: 0, urgent: false }
+    ]},
+    { id: "inprogress", title: "In Progress", items: [] },
+    { id: "done", title: "Done", items: [] }
+  ]
+};
+
+function cid() { return 'c' + Math.random().toString(36).slice(2, 10); }
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  renderStats();
+}
+
+let state = loadState();
+let dragItemId = null;
+let dragFromCol = null;
+
+const board = document.getElementById('board');
+
+function fmt(n) {
+  n = Number(n) || 0;
+  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function renderStats() {
+  let itemsTotal = 0, laborTotal = 0, spent = 0;
+  state.columns.forEach(col => col.items.forEach(it => {
+    itemsTotal += Number(it.itemsCost) || 0;
+    laborTotal += Number(it.laborCost) || 0;
+    spent += Number(it.spent) || 0;
+  }));
+  const budgeted = itemsTotal + laborTotal;
+  document.getElementById('statItems').textContent = fmt(itemsTotal);
+  document.getElementById('statLabor').textContent = fmt(laborTotal);
+  document.getElementById('statBudgeted').textContent = fmt(budgeted);
+  document.getElementById('statSpent').textContent = fmt(spent);
+
+  const cap = state.cap;
+  const remaining = (cap != null ? cap : budgeted) - spent;
+  const remWrap = document.getElementById('statRemainingWrap');
+  const remEl = document.getElementById('statRemaining');
+  remEl.textContent = fmt(remaining);
+  remWrap.classList.toggle('over', remaining < 0);
+
+  const capInput = document.getElementById('capInput');
+  if (document.activeElement !== capInput) {
+    capInput.value = cap != null ? cap : '';
+  }
+}
+
+function render() {
+  board.innerHTML = '';
+  state.columns.forEach(col => {
+    const colEl = document.createElement('div');
+    colEl.className = 'column';
+    colEl.dataset.colId = col.id;
+
+    colEl.addEventListener('dragover', e => {
+      e.preventDefault();
+      colEl.classList.add('dragover');
+    });
+    colEl.addEventListener('dragleave', () => colEl.classList.remove('dragover'));
+    colEl.addEventListener('drop', e => {
+      e.preventDefault();
+      colEl.classList.remove('dragover');
+      if (!dragItemId) return;
+      const fromCol = state.columns.find(c => c.id === dragFromCol);
+      const idx = fromCol.items.findIndex(i => i.id === dragItemId);
+      if (idx === -1) return;
+      const [item] = fromCol.items.splice(idx, 1);
+      col.items.push(item);
+      saveState();
+      render();
+    });
+
+    const header = document.createElement('div');
+    header.className = 'column-header';
+    header.innerHTML = `<span>${col.title}</span><span class="column-count">${col.items.length}</span>`;
+    colEl.appendChild(header);
+
+    const cardsEl = document.createElement('div');
+    cardsEl.className = 'cards';
+
+    col.items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'card' + (item.urgent ? ' urgent' : '');
+      card.draggable = true;
+      card.dataset.itemId = item.id;
+
+      card.addEventListener('dragstart', () => {
+        dragItemId = item.id;
+        dragFromCol = col.id;
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+      const total = (Number(item.itemsCost) || 0) + (Number(item.laborCost) || 0);
+      card.title = 'Click to view details';
+      card.innerHTML = `
+        <div class="card-row">
+          <span class="card-row-title">${item.urgent ? '⚠ ' : ''}${escapeHtml(item.title)}</span>
+          <span class="card-row-total">₱${fmt(total)}</span>
+          <span class="del" title="Delete">✕</span>
+        </div>
+        <div class="card-detail" style="display:none">
+          ${item.notes ? `<div class="card-notes">${escapeHtml(item.notes)}</div>` : '<div class="card-notes">No notes yet.</div>'}
+          <div class="card-budget"><span>Items: <b>${fmt(item.itemsCost)}</b></span><span>Labor: <b>${fmt(item.laborCost)}</b></span></div>
+          <div class="card-budget"><span>Spent: <b>${fmt(item.spent)}</b></span></div>
+          <div class="card-detail-actions"><button class="btn-cancel edit-btn">Edit</button></div>
+        </div>
+      `;
+      card.querySelector('.del').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete "${item.title}"?`)) {
+          col.items = col.items.filter(i => i.id !== item.id);
+          saveState();
+          render();
+        }
+      });
+      card.querySelector('.edit-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        editItem(col, item);
+      });
+      card.querySelector('.card-row').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const detail = card.querySelector('.card-detail');
+        detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+      });
+      cardsEl.appendChild(card);
+    });
+
+    colEl.appendChild(cardsEl);
+
+    const addToggle = document.createElement('button');
+    addToggle.className = 'add-toggle';
+    addToggle.textContent = '+ Add item';
+    const form = buildAddForm(col);
+    addToggle.addEventListener('click', () => {
+      form.classList.toggle('open');
+      if (form.classList.contains('open')) form.querySelector('input').focus();
+    });
+    colEl.appendChild(addToggle);
+    colEl.appendChild(form);
+
+    board.appendChild(colEl);
+  });
+  renderStats();
+}
+
+function buildAddForm(col) {
+  const form = document.createElement('div');
+  form.className = 'add-form';
+  form.innerHTML = `
+    <input type="text" placeholder="Item title" class="f-title">
+    <textarea placeholder="Notes (optional)" class="f-notes"></textarea>
+    <div class="add-form-row">
+      <input type="number" placeholder="Items cost" class="f-items" min="0">
+      <input type="number" placeholder="Labor cost" class="f-labor" min="0">
+    </div>
+    <div class="add-form-row">
+      <input type="number" placeholder="Spent so far" class="f-spent" min="0">
+    </div>
+    <label><input type="checkbox" class="f-urgent"> Mark urgent</label>
+    <div class="add-form-actions">
+      <button class="btn-primary">Add</button>
+      <button class="btn-cancel">Cancel</button>
+    </div>
+  `;
+  const [addBtn, cancelBtn] = form.querySelectorAll('button');
+  addBtn.addEventListener('click', () => {
+    const title = form.querySelector('.f-title').value.trim();
+    if (!title) return;
+    col.items.push({
+      id: cid(),
+      title,
+      notes: form.querySelector('.f-notes').value.trim(),
+      itemsCost: Number(form.querySelector('.f-items').value) || 0,
+      laborCost: Number(form.querySelector('.f-labor').value) || 0,
+      spent: Number(form.querySelector('.f-spent').value) || 0,
+      urgent: form.querySelector('.f-urgent').checked
+    });
+    saveState();
+    render();
+  });
+  cancelBtn.addEventListener('click', () => form.classList.remove('open'));
+  return form;
+}
+
+function editItem(col, item) {
+  const newNotes = prompt(`Notes for "${item.title}":`, item.notes || '');
+  if (newNotes === null) return;
+  item.notes = newNotes.trim();
+
+  const newItems = prompt(`Items cost for "${item.title}":`, item.itemsCost);
+  if (newItems !== null) {
+    const n = Number(newItems);
+    if (!isNaN(n)) item.itemsCost = n;
+  }
+
+  const newLabor = prompt(`Labor cost for "${item.title}":`, item.laborCost);
+  if (newLabor !== null) {
+    const n = Number(newLabor);
+    if (!isNaN(n)) item.laborCost = n;
+  }
+
+  const newSpent = prompt(`Spent so far for "${item.title}":`, item.spent);
+  if (newSpent !== null) {
+    const n = Number(newSpent);
+    if (!isNaN(n)) item.spent = n;
+  }
+  saveState();
+  render();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+document.getElementById('capInput').addEventListener('change', (e) => {
+  const v = e.target.value;
+  state.cap = v === '' ? null : Number(v);
+  saveState();
+});
+
+render();
+</script>
+</body>
+</html>
